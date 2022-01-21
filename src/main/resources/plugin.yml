@@ -1,0 +1,5 @@
+name: SnowBallLauncher
+version: '${project.version}'
+main: net.azisaba.lobby.SnowBallLauncher
+authors: [ 5hak3 ]
+description: SNOW BALL LAUNCH Infinityyyyyyyyyyyyyyyyyyyyy!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
