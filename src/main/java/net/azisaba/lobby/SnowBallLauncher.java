@@ -4,9 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Snowball;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -18,6 +16,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.material.MaterialData;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 
 public final class SnowBallLauncher extends JavaPlugin implements Listener {
@@ -59,9 +58,91 @@ public final class SnowBallLauncher extends JavaPlugin implements Listener {
     @EventHandler
     public void onHit (ProjectileHitEvent event) {
         Entity prj = event.getEntity();
+        if (!(prj instanceof Snowball)) return;
         prj.getWorld().spawnParticle(Particle.BLOCK_CRACK, prj.getLocation(), 10, 0, 0, 0, 1.0F, new MaterialData(Material.ICE));
         if (event.getHitBlock() != null)
             prj.getWorld().playSound(prj.getLocation(), Sound.BLOCK_GLASS_BREAK, 0.5F, 5.0F);
+
+        if (!(event.getHitEntity() instanceof Player)) return;
+
+        getServer().broadcast("Hitted " + event.getHitEntity().getName(), "");
+
+        Player hitted = (Player) (event.getHitEntity());
+        double damage = 1.0;
+        double health = hitted.getHealth();
+
+        Object player = null;
+        try {
+            player = NMS.method_CraftPlayer_getHandle.invoke(
+                    NMS.class_obc_CraftPlayer.cast(hitted)
+            );
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        Object snowball = null;
+        try {
+            snowball = NMS.method_CraftSnowball_getHandle.invoke(
+                    NMS.class_obc_CraftSnowball.cast((Snowball) prj)
+            );
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        Object damageSource = null;
+        try {
+            damageSource = NMS.method_DamageSource_projectile.invoke(
+                    null,
+                    snowball,
+                    NMS.method_EntitySnowball_getShooter.invoke(
+                            snowball
+                    )
+            );
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        if (health <= damage) {
+            try {
+                NMS.method_EntityPlayer_killEntity.invoke(
+                        player
+                );
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        hitted.setHealth(health - damage);
+        try {
+            NMS.method_CombatTracker_trackDamage.invoke(
+                    NMS.method_EntityPlayer_getCombatTracker.invoke(player),
+                    damageSource,
+                    (float)health,
+                    (float)damage
+            );
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            NMS.method_EntityPlayer_setAbsorptionHearts.invoke(
+                    player,
+                    (float)(NMS.method_EntityPlayer_getAbsorptionHearts.invoke(player)) - (float)damage
+            );
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            NMS.method_World_broadcastEntityEffect.invoke(
+                    NMS.field_EntityPlayer_world.get(player),
+                    player,
+                    (byte)2
+            );
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
