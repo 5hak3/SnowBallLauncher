@@ -8,6 +8,7 @@ import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
@@ -55,26 +56,32 @@ public final class SnowBallLauncher extends JavaPlugin implements Listener {
         }
     }
 
+    /**
+     * 当たった人NMS使ってダメージを無理矢理入れるやつ
+     * @param event PrjHitEv
+     */
     @EventHandler
     public void onHit (ProjectileHitEvent event) {
         Entity prj = event.getEntity();
         if (!(prj instanceof Snowball)) return;
+
         prj.getWorld().spawnParticle(Particle.BLOCK_CRACK, prj.getLocation(), 10, 0, 0, 0, 1.0F, new MaterialData(Material.ICE));
         if (event.getHitBlock() != null)
             prj.getWorld().playSound(prj.getLocation(), Sound.BLOCK_GLASS_BREAK, 0.5F, 5.0F);
 
         if (!(event.getHitEntity() instanceof Player)) return;
-
-        getServer().broadcast("Hitted " + event.getHitEntity().getName(), "");
-
         Player hitted = (Player) (event.getHitEntity());
+
+        if(hitted.getInventory().getItemInMainHand().getType() != Material.SNOW_BALL) return;
+
         double damage = 1.0;
         double health = hitted.getHealth();
 
+        // この辺からNMSでいい感じにやる (Walkureのパクリ)
         Object player = null;
         try {
             player = NMS.method_CraftPlayer_getHandle.invoke(
-                    NMS.class_obc_CraftPlayer.cast(hitted)
+                    hitted
             );
         } catch (IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
@@ -83,7 +90,7 @@ public final class SnowBallLauncher extends JavaPlugin implements Listener {
         Object snowball = null;
         try {
             snowball = NMS.method_CraftSnowball_getHandle.invoke(
-                    NMS.class_obc_CraftSnowball.cast((Snowball) prj)
+                    prj
             );
         } catch (IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
@@ -143,6 +150,18 @@ public final class SnowBallLauncher extends JavaPlugin implements Listener {
         } catch (IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
         }
+
+        hitted.setNoDamageTicks(0);
+    }
+
+    /**
+     * ないとダメージ判定がおかしくなるみたいなので
+     * @param event EntDmgByEntEv
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof  Player && event.getDamager() instanceof Snowball)) return;
+        event.setCancelled(true);
     }
 
     /**
